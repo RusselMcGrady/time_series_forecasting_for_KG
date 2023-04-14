@@ -24,15 +24,10 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 
-PLOT_BIAS = True
-PLOT_PREDICT = True
-SCALER = True
-LINEAR_DECODER = False
-
 # Check if GPU is available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def eval(model, test_time_data, src_mask, tgt_mask, loss_fn, batch_first, batch_size, input_size, forecast_window, PLOT_BIAS, PLOT_PREDICT, SCALER):
+def eval(model, test_time_data, src_mask, tgt_mask, loss_fn, batch_first, batch_size, input_size, forecast_window, PLOT_BIAS, PLOT_PREDICT, SCALER, LINEAR_DECODER):
     # Set the model to evaluation mode
     model.eval()
     output = torch.Tensor(0)    
@@ -146,6 +141,8 @@ if __name__ == "__main__":
         help="GPU device ID. Use -1 for CPU training"
     )
     argparser.add_argument("--SCALER", type=bool, default=True)
+    argparser.add_argument("--PLOT_BIAS", type=bool, default=True)
+    argparser.add_argument("--PLOT_PREDICT", type=bool, default=True)
     argparser.add_argument("--LINEAR_DECODER", type=bool, default=False)
     argparser.add_argument("--test_size", type=float, default=0.2)
     argparser.add_argument("--batch_size", type=int, default=32)
@@ -215,12 +212,12 @@ if __name__ == "__main__":
     )
 
     # looks like normalizing input values curtial for the model
-    # scaler = MinMaxScaler(feature_range=(-1, 1))
-    scaler = StandardScaler()
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    # scaler = StandardScaler()
     # Recover the original values
     # original_data = scaler.inverse_transform(scaled_data)
     series = test_time_data[input_variables].values
-    if SCALER:
+    if args.SCALER:
         amplitude = scaler.fit_transform(series)
     else:
         amplitude = series
@@ -276,5 +273,5 @@ if __name__ == "__main__":
 
     # Iterate over all (x,y) pairs in validation dataloader
     with torch.no_grad():
-        eval(model, test_time_data, src_mask, tgt_mask, loss_fn, args.batch_first, args.batch_size, input_size, args.forecast_window, PLOT_BIAS, PLOT_PREDICT, SCALER)
+        eval(model, test_time_data, src_mask, tgt_mask, loss_fn, args.batch_first, args.batch_size, input_size, args.forecast_window, args.PLOT_BIAS, args.PLOT_PREDICT, args.SCALER, args.LINEAR_DECODER)
 

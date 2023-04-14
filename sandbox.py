@@ -82,7 +82,7 @@ def train(model, training_time_data, src_mask, tgt_mask, loss_fn, optimizer, sch
                     output = output.permute(1, 0, 2)
                     trg_y = trg_y.permute(1, 0, 2)
             
-                loss = loss_fn(output, trg_y)
+                loss = loss_fn(output, trg_y) #output.flatten()
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
@@ -183,8 +183,8 @@ if __name__ == "__main__":
         slice_size=training_slice_size)
 
     # looks like normalizing input values curtial for the model
-    # scaler = MinMaxScaler(feature_range=(-1, 1))
-    scaler = StandardScaler()
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    # scaler = StandardScaler()
     # Recover the original values
     # original_data = scaler.inverse_transform(scaled_data)
     series = training_time_data[input_variables].values
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
 
     # Define the warm-up schedule
-    num_epochs = 200 # 50
+    num_epochs = 2000 # 50
     # total_steps = len(training_time_data) * num_epochs
     # Create the scheduler
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=5, num_training_steps=num_epochs)

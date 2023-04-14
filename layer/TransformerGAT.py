@@ -173,8 +173,8 @@ class TimeSeriesTransformer(nn.Module):
         
         # diverse decoder trial
         
-        self.fcn = nn.Conv1d(dim_val, num_predicted_features, kernel_size=1)
-        self.conv_init(self.fcn)
+        self.conv1d = nn.Conv1d(dim_val, num_predicted_features, kernel_size=1)
+        self.conv_init(self.conv1d)
         
         self.lineardecoder = nn.Linear(dim_val,num_predicted_features)
         self.init_weights()
@@ -244,9 +244,7 @@ class TimeSeriesTransformer(nn.Module):
             decoder_output = self.lineardecoder(src)
 
             # 1 dimension conv
-            # decoder_output = self.fcn(src.permute(0,2,1)).permute(0,2,1)
-            # decoder_output = F.avg_pool1d(decoder_output, 1)
-            # decoder_output = decoder_output.view(decoder_output.size(-1,3,2))
+            # decoder_output = self.conv1d(src.permute(0,2,1)).permute(0,2,1)
         else:
             # Pass decoder input through decoder input layer
             decoder_output = self.decoder_input_layer(tgt) # src shape: [target sequence length, batch_size, dim_val] regardless of number of input features

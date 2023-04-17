@@ -224,11 +224,11 @@ class TimeSeriesTransformer(nn.Module):
         #print("From model.forward(): tgt size = {}".format(tgt.size()))
 
         # Pass throguh the input layer right before the encoder
-        src = self.encoder_input_layer(src) # src shape: [batch_size, src length, dim_val] regardless of number of input features
+        src = self.encoder_input_layer(src) # src shape: [src length, batch_size, dim_val] regardless of number of input features
         #print("From model.forward(): Size of src after input layer: {}".format(src.size()))
 
         # Pass through the positional encoding layer
-        src = self.positional_encoding_layer(src) # src shape: [batch_size, src length, dim_val] regardless of number of input features
+        src = self.positional_encoding_layer(src) # src shape: [src length, batch_size, dim_val] regardless of number of input features
         #print("From model.forward(): Size of src after pos_enc layer: {}".format(src.size()))
 
         # Pass through all the stacked encoder layers in the encoder
@@ -236,7 +236,7 @@ class TimeSeriesTransformer(nn.Module):
         # which they are not in this time series use case, because all my
         # input sequences are naturally of the same length. 
         # (https://github.com/huggingface/transformers/issues/4083)
-        src = self.encoder( # src shape: [batch_size, enc_seq_len, dim_val]
+        src = self.encoder( # src shape: [enc_seq_len, batch_size, dim_val]
             src=src
             )
         #print("From model.forward(): Size of src after encoder: {}".format(src.size()))
@@ -254,7 +254,7 @@ class TimeSeriesTransformer(nn.Module):
             #print("From model.forward(): Size of decoder_output after linear decoder layer: {}".format(decoder_output.size()))
 
             # Pass through the positional encoding layer
-            decoder_output = self.positional_decoding_layer(decoder_output) # src shape: [batch_size, src length, dim_val] regardless of number of input features
+            decoder_output = self.positional_decoding_layer(decoder_output) # src shape: [src length, batch_size, dim_val] regardless of number of input features
             #print("From model.forward(): Size of src after pos_enc layer: {}".format(src.size()))
 
             #if src_mask is not None:
@@ -262,7 +262,7 @@ class TimeSeriesTransformer(nn.Module):
             #if tgt_mask is not None:
                 #print("From model.forward(): Size of tgt_mask: {}".format(tgt_mask.size()))
 
-            # Pass throguh decoder - output shape: [batch_size, target seq len, dim_val]
+            # Pass throguh decoder - output shape: [target seq len, batch_size, dim_val]
             decoder_output = self.decoder(
                 tgt=decoder_output,
                 memory=src,
@@ -273,7 +273,7 @@ class TimeSeriesTransformer(nn.Module):
             #print("From model.forward(): decoder_output shape after decoder: {}".format(decoder_output.shape))
 
             # Pass through linear mapping
-            decoder_output = self.linear_mapping(decoder_output) # shape [batch_size, target seq len]
+            decoder_output = self.linear_mapping(decoder_output) # shape [target seq len, batch_size, feature_dim]
             #print("From model.forward(): decoder_output size after linear_mapping = {}".format(decoder_output.size()))
 
         return decoder_output
@@ -298,7 +298,7 @@ class GraphAttentionLayer(nn.Module):
         self.leakyrelu = nn.LeakyReLU(self.alpha)
 
 
-    def forward(self, input, adj):
+    def forward(self, input, edge_index):
         #batch_size = input.size(0)
         #h = torch.bmm(input, self.W.expand(batch_size, self.in_features, self.out_features))
         #f_1 = torch.bmm(h, self.a1.expand(batch_size, self.out_features, 1))
@@ -316,13 +316,13 @@ class GraphAttentionLayer(nn.Module):
             #h_prime = h_prime + input
 
         # obtain the indices of the non-zero elements
-        row, col = torch.where(adj != 0)
+        # row, col = torch.where(adj != 0)
         # concatenate row and col tensors to obtain edge index
-        edge_index = torch.stack([row, col], dim=0)
+        # edge_index = torch.stack([row, col], dim=0)
 
         # Convert input tensor to 2D feature matrix
-        batch_size, num_nodes, in_channels, num_features = input.shape
-        features = input.view(batch_size, num_nodes, in_channels * num_features)
+        in_channels, batch_size, num_features = input.shape # in_channels refer to the seq_len
+        features = input.view(batch_size, in_channels * num_features)
 
         h = self.conv1(features, edge_index)
         #x = torch.relu(x)

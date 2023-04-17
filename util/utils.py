@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 import pandas as pd
 
+from collections import OrderedDict
 from torch import nn, Tensor
 from typing import Optional, Any, Union, Callable, Tuple
 from pathlib import Path
@@ -230,6 +231,11 @@ def read_data(data_dir: Union[str, Path] = "data", file_name: str="dfs_merged_up
         low_memory=False
     )
 
+    ## reset the node index divide by the len of period, 52 here
+    # for i in range(len(data)//52):
+    #     data["Node Index"][0+52*i:52*(i+1)] = i
+    # data.to_csv(data_path, index=True)
+
     # Make sure all "n/e" values have been removed from df. 
     if is_ne_in_df(data):
         raise ValueError("data frame contains 'n/e' values. These must be handled")
@@ -292,6 +298,63 @@ def to_numeric_and_downcast_data(df: pd.DataFrame):
     df[icols] = df[icols].apply(pd.to_numeric, downcast='integer')
 
     return df
+
+def read_projection_map(data_dir: Union[str, Path] = "data", file_name: str="dfs_merged_upload") -> OrderedDict:
+    
+    # Ensure that `data_dir` is a Path object
+    data_dir = Path(data_dir)
+
+    # Read csv file
+    csv_files = list(data_dir.glob(file_name+".csv"))
+    
+    if len(csv_files) == 0:
+         raise ValueError("data_dir must contain at least 1 csv file.")
+
+    data_path = csv_files[0]
+
+    print("Reading file in {}".format(data_path))
+
+    df = pd.read_csv(data_path)
+
+    # Create an OrderedDict from the DataFrame:
+    d = OrderedDict(zip(df.values[:,0], df.values[:,1]))
+    return d
+
+
+def index_for_feature_projection(d, given_index):
+    sum_values = 0
+    for index, (key, value) in enumerate(d.items()):
+        if index < given_index:
+            sum_values += value
+    return sum_values
+
+
+def generate_adj_from_edgeidx(edge_index: Tensor) -> Tensor:
+    """
+    generate adj given the edge index
+    the edge_index tensor to be in the compressed sparse row (CSR) format, which requires the column indices to be sorted.
+    Example edge_index tensor edge_index = torch.tensor([[0, 0, 1, 1, 2, 3, 3, 4], [1, 3, 0, 2, 3, 1, 4, 3]])
+    """
+
+    # Compute number of nodes from edge_index tensor
+    num_nodes = edge_index.max().item() + 1
+
+    # Create a sparse COO tensor with ones at the locations specified by the edge_index tensor
+    adj_matrix = torch.sparse_coo_tensor(edge_index, torch.ones(edge_index.shape[1]), 
+                                        (num_nodes, num_nodes))
+
+    # Convert sparse tensor to dense tensor
+    adj_matrix = adj_matrix.to_dense()
+
+    # return adjacency matrix
+    return adj_matrix
+
+def generate_edgeidx_from_adj(adj: Tensor) -> Tensor:
+    # obtain the indices of the non-zero elements
+    row, col = torch.where(adj != 0)
+    # concatenate row and col tensors to obtain edge index
+    edge_index = torch.stack([row, col], dim=0)
+    return edge_index
 
 
 def plot(output, truth, step, plot_length, loss):
@@ -367,11 +430,11 @@ def evaluate_forecast(y_true, y_pred):
     mae = mean_absolute_error(y_true, y_pred)
     mse = mean_squared_error(y_true, y_pred)
     rmse = np.sqrt(mse)
-    mape = mean_absolute_percentage_error(y_true, y_pred)
+    # mape = mean_absolute_percentage_error(y_true, y_pred)
     smape = symmetric_mean_absolute_percentage_error(y_true, y_pred)
     
     print("Mean Absolute Error (MAE):", mae)
     print("Mean Squared Error (MSE):", mse)
     print("Root Mean Squared Error (RMSE):", rmse)
-    print("Mean Absolute Percentage Error (MAPE):", mape)
+    # print("Mean Absolute Percentage Error (MAPE):", mape)
     print("Symmetric Mean Absolute Percentage Error (sMAPE):", smape)

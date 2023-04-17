@@ -98,6 +98,7 @@ def eval(model, test_time_data, src_mask, tgt_mask, loss_fn, batch_first, batch_
 
     if PLOT_BIAS == True:
         plot_length = len(output)
+        # plot_length = 100
         utils.plot(output, truth, step, plot_length, total_loss/plot_length)
     
     if PLOT_PREDICT == True:
@@ -140,7 +141,11 @@ if __name__ == "__main__":
         default=0,
         help="GPU device ID. Use -1 for CPU training"
     )
-    argparser.add_argument("--SCALER", type=bool, default=True)
+    argparser.add_argument("--data_file", type=str, default='forecast_cyclical_data',
+                           help="file name wo/ suffix")
+    argparser.add_argument("--projection_map_file", type=str, default='projection_map',
+                           help="file name wo/ suffix")
+    argparser.add_argument("--SCALER", type=bool, default=False)
     argparser.add_argument("--PLOT_BIAS", type=bool, default=True)
     argparser.add_argument("--PLOT_PREDICT", type=bool, default=True)
     argparser.add_argument("--LINEAR_DECODER", type=bool, default=False)
@@ -189,7 +194,7 @@ if __name__ == "__main__":
     # Read data
     # Input x
     # (batch_size, nodes, sequentials, features)
-    data, slice_size = utils.read_data(file_name='forecast_cyclical_data', node_col_name=args.node_col, timestamp_col_name=args.timestamp_col)
+    data, slice_size = utils.read_data(file_name=args.data_file, node_col_name=args.node_col, timestamp_col_name=args.timestamp_col)
 
     # Get test data from dataset
     ratio = round(slice_size*args.test_size)
@@ -216,7 +221,17 @@ if __name__ == "__main__":
     # scaler = StandardScaler()
     # Recover the original values
     # original_data = scaler.inverse_transform(scaled_data)
-    series = test_time_data[input_variables].values
+    map_series = test_time_data[input_variables].values
+    labels = test_time_data["Node Label"].values
+    
+    # dic for label wise feature projection, e.g., OrderedDict([(0, 3), (1, 2))])
+    dic = utils.read_projection_map(file_name=args.projection_map_file)
+    series = np.zeros((len(map_series), sum(dic.values())))
+    for i in range(len(series)):
+        given_index = labels[i]
+        index = utils.index_for_feature_projection(dic, given_index)
+        series[i][index:index+dic[given_index]] = map_series[i][map_series[i] != 0]
+
     if args.SCALER:
         amplitude = scaler.fit_transform(series)
     else:
@@ -257,7 +272,7 @@ if __name__ == "__main__":
         num_predicted_features=len(input_variables) # 1 if univariate
         ).to(device)
 
-    # Define the file path, same as the forecast_window
+    # Define the file path, same as the forecast_window: 'model/model4D_5_1_all_2000e.pth'
     PATH = 'model/model4D_{}_{}.pth'.format(args.enc_seq_len, args.output_sequence_length)
 
     # Load the saved state dictionary into the model

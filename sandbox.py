@@ -41,7 +41,7 @@ def train(model, training_time_data, src_mask, tgt_mask, loss_fn, optimizer, sch
         
         src, trg, trg_y = batch
         B, N, T, F = trg_y.size()
-        if input_size == 1:
+        if input_size == 1: # todo
             trg_y.unsqueeze(-1) # feature size = 1
         src, trg, trg_y = src.to(device), trg.to(device), trg_y.to(device)
 
@@ -87,13 +87,13 @@ def train(model, training_time_data, src_mask, tgt_mask, loss_fn, optimizer, sch
                 optimizer.step()
                 total_loss += loss.item()
 
-        ave_node_loss = total_loss / N
+        ave_batch_loss = total_loss / B
         elapsed = time.time() - start_time
         print('| epoch {:3d} | step {:3d} | '
                 'lr {:02.8f} | {:5.2f} ms | '
                 'batch node loss {:5.5f} | ppl {:8.2f}'.format(
                 epoch, step, scheduler.get_last_lr()[0], # get_lr()
-                elapsed * 1000, ave_node_loss, math.exp(ave_node_loss))) # math.log(cur_loss)
+                elapsed * 1000, ave_batch_loss, math.exp(ave_batch_loss))) # math.log(cur_loss)
         
     total_loss = 0
     start_time = time.time()
@@ -119,7 +119,11 @@ if __name__ == "__main__":
         default=0,
         help="GPU device ID. Use -1 for CPU training"
     )
-    argparser.add_argument("--SCALER", type=bool, default=True)
+    argparser.add_argument("--data_file", type=str, default='forecast_cyclical_data',
+                           help="file name wo/ suffix")
+    argparser.add_argument("--projection_map_file", type=str, default='projection_map',
+                           help="file name wo/ suffix")
+    argparser.add_argument("--SCALER", type=bool, default=False)
     argparser.add_argument("--LINEAR_DECODER", type=bool, default=False)
     argparser.add_argument("--test_size", type=float, default=0.2)
     argparser.add_argument("--batch_size", type=int, default=32)
@@ -164,7 +168,7 @@ if __name__ == "__main__":
     # Read data
     # Input x
     # (batch_size, nodes, sequentials, features)
-    data, slice_size = utils.read_data(file_name='forecast_cyclical_data', node_col_name=args.node_col, timestamp_col_name=args.timestamp_col)
+    data, slice_size = utils.read_data(file_name=args.data_file, node_col_name=args.node_col, timestamp_col_name=args.timestamp_col)
 
     # Remove test data from dataset for each node
     ratio = round(slice_size*(1-args.test_size))
@@ -187,11 +191,16 @@ if __name__ == "__main__":
     # scaler = StandardScaler()
     # Recover the original values
     # original_data = scaler.inverse_transform(scaled_data)
-    series = training_time_data[input_variables].values
-
-    # for i, val in enumerate(series.mean(axis=0)):
-    #      series[:,i][series[:,i] == 0] = val
-    # series = np.where(series == 0, 1e-9, series)
+    map_series = training_time_data[input_variables].values
+    labels = training_time_data["Node Label"].values
+    
+    # dic for label wise feature projection, e.g., OrderedDict([(0, 3), (1, 2))])
+    dic = utils.read_projection_map(file_name=args.projection_map_file)
+    series = np.zeros((len(map_series), sum(dic.values())))
+    for i in range(len(series)):
+        given_index = labels[i]
+        index = utils.index_for_feature_projection(dic, given_index)
+        series[i][index:index+dic[given_index]] = map_series[i][map_series[i] != 0]
 
     if args.SCALER:
         amplitude = scaler.fit_transform(series)
@@ -199,7 +208,7 @@ if __name__ == "__main__":
         amplitude = series
         
     # Making instance of custom dataset class
-    training_time_data = ds.TransformerDataset( ## todo
+    training_time_data = ds.TransformerDataset(
         data=torch.tensor(amplitude).float(),
         indices=training_indices,
         enc_seq_len=args.enc_seq_len,
@@ -238,7 +247,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
 
     # Define the warm-up schedule
-    num_epochs = 2000 # 50
+    num_epochs = 100 # 50
     # total_steps = len(training_time_data) * num_epochs
     # Create the scheduler
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=5, num_training_steps=num_epochs)

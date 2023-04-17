@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 import math
+import numpy as np
 
 from torch import nn, Tensor
 from layer.positional_encoder import PositionalEncoder
@@ -173,8 +174,8 @@ class TimeSeriesTransformer(nn.Module):
         
         # diverse decoder trial
         
-        self.conv1d = nn.Conv1d(dim_val, num_predicted_features, kernel_size=1)
-        self.conv_init(self.conv1d)
+        self.fcn = nn.Conv1d(dim_val, num_predicted_features, kernel_size=1)
+        self.conv_init(self.fcn)
         
         self.lineardecoder = nn.Linear(dim_val,num_predicted_features)
         self.init_weights()
@@ -244,7 +245,9 @@ class TimeSeriesTransformer(nn.Module):
             decoder_output = self.lineardecoder(src)
 
             # 1 dimension conv
-            # decoder_output = self.conv1d(src.permute(0,2,1)).permute(0,2,1)
+            # decoder_output = self.fcn(src.permute(0,2,1)).permute(0,2,1)
+            # decoder_output = F.avg_pool1d(decoder_output, 1)
+            # decoder_output = decoder_output.view(decoder_output.size(-1,3,2))
         else:
             # Pass decoder input through decoder input layer
             decoder_output = self.decoder_input_layer(tgt) # src shape: [target sequence length, batch_size, dim_val] regardless of number of input features
@@ -364,7 +367,7 @@ class STGATBlock(nn.Module):
             self.temporal.to(self.cuda)
             self.spatial.to(self.cuda)
    
-    def forward(self, src, trg, src_mask, tgt_mask, A_hat):
+    def forward(self, src, trg, src_mask, tgt_mask, edge_index): # edge_index of size (2, num_edges)
         residual = X #todo
         t = self.temporal(
             src=src,
@@ -445,7 +448,7 @@ class EndConv(nn.Module):
                 layers.append(GatedLinearUnits(in_channels, nhid_channels, kernel_size=1, dilation=1, groups=1))
             else:
                 layers.append(GatedLinearUnits(nhid_channels, nhid_channels, kernel_size=3, dilation=1, groups=1))
-        layers.append(nn.Conv1d(nhid_channels, out_channels, 1))
+        layers.append(nn.Conv1d(nhid_channels, out_channels, 1)) ## todo
         self.units = nn.Sequential(*layers)
     
     def forward(self, X):

@@ -145,7 +145,7 @@ if __name__ == "__main__":
                            help="file name wo/ suffix")
     argparser.add_argument("--projection_map_file", type=str, default='projection_map',
                            help="file name wo/ suffix")
-    argparser.add_argument("--SCALER", type=bool, default=False)
+    argparser.add_argument("--SCALER", type=bool, default=True)
     argparser.add_argument("--PLOT_BIAS", type=bool, default=True)
     argparser.add_argument("--PLOT_PREDICT", type=bool, default=True)
     argparser.add_argument("--LINEAR_DECODER", type=bool, default=False)
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     argparser.add_argument("--n_heads", type=int, default=8)
     argparser.add_argument("--n_decoder_layers", type=int, default=4)
     argparser.add_argument("--n_encoder_layers", type=int, default=4)
-    argparser.add_argument("--enc_seq_len", type=int, default=5,
+    argparser.add_argument("--enc_seq_len", type=int, default=4,
                            help="length of input given to encoder 153")
     argparser.add_argument("--dec_seq_len", type=int, default=1,
                            help="length of input given to decoder 92")
@@ -226,11 +226,12 @@ if __name__ == "__main__":
     
     # dic for label wise feature projection, e.g., OrderedDict([(0, 3), (1, 2))])
     dic = utils.read_projection_map(file_name=args.projection_map_file)
-    series = np.zeros((len(map_series), sum(dic.values())))
+    series = np.zeros((len(map_series), sum(dic.values()))) # 0 avoid the impact of -1 values for the scaler func.
+    # series = np.full((len(map_series), sum(dic.values())), -1.) # -1 denotes the absence feature of each node
     for i in range(len(series)):
         given_index = labels[i]
         index = utils.index_for_feature_projection(dic, given_index)
-        series[i][index:index+dic[given_index]] = map_series[i][map_series[i] != 0]
+        series[i][index:index+dic[given_index]] = map_series[i][map_series[i] != -1]
 
     if args.SCALER:
         amplitude = scaler.fit_transform(series)
@@ -272,7 +273,7 @@ if __name__ == "__main__":
         num_predicted_features=len(input_variables) # 1 if univariate
         ).to(device)
 
-    # Define the file path, same as the forecast_window: 'model/model4D_5_1_all_2000e.pth'
+    # Define the file path, same as the forecast_window
     PATH = 'model/model4D_{}_{}.pth'.format(args.enc_seq_len, args.output_sequence_length)
 
     # Load the saved state dictionary into the model
@@ -281,8 +282,8 @@ if __name__ == "__main__":
     # state_dict  = torch.load(PATH, map_location=torch.device('cpu'))
     # model.load_state_dict(state_dict)
 
-    loss_fn = torch.nn.HuberLoss().to(device)
-    # loss_fn = torch.nn.MSELoss().to(device)
+    # loss_fn = torch.nn.HuberLoss().to(device)
+    loss_fn = torch.nn.MSELoss().to(device)
 
 
 

@@ -231,9 +231,10 @@ def read_data(data_dir: Union[str, Path] = "data", file_name: str="dfs_merged_up
         low_memory=False
     )
 
-    ## reset the node index divide by the len of period, 52 here
+    ## reset the columns of "node index" and "Time Period index" divided by the len of period, 52 here
     # for i in range(len(data)//52):
     #     data["Node Index"][0+52*i:52*(i+1)] = i
+    #     data["Time Period"][0+52*i:52*(i+1)] = np.arange(1,53)
     # data.to_csv(data_path, index=True)
 
     # Make sure all "n/e" values have been removed from df. 
@@ -319,6 +320,24 @@ def read_projection_map(data_dir: Union[str, Path] = "data", file_name: str="dfs
     # Create an OrderedDict from the DataFrame:
     d = OrderedDict(zip(df.values[:,0], df.values[:,1]))
     return d
+
+def read_edgeIdx(data_dir: Union[str, Path] = "data", file_name: str="dfs_merged_upload") -> list[list[int]]:
+    
+    # Ensure that `data_dir` is a Path object
+    data_dir = Path(data_dir)
+
+    # Read csv file
+    csv_files = list(data_dir.glob(file_name+".csv"))
+    
+    if len(csv_files) == 0:
+         raise ValueError("data_dir must contain at least 1 csv file.")
+
+    data_path = csv_files[0]
+
+    print("Reading file in {}".format(data_path))
+
+    df = pd.read_csv(data_path)
+    return df.values.T
 
 
 def index_for_feature_projection(d, given_index):

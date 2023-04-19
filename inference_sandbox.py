@@ -158,10 +158,10 @@ if __name__ == "__main__":
     argparser.add_argument("--enc_seq_len", type=int, default=4,
                            help="length of input given to encoder 153")
     argparser.add_argument("--dec_seq_len", type=int, default=1,
-                           help="length of input given to decoder 92")
-    argparser.add_argument("--output_sequence_length", type=int, default=1,
+                           help="length of input given to decoder 48. Must equal to output_seq_len")
+    argparser.add_argument("--output_seq_len", type=int, default=1,
                            help="target sequence length. If hourly data and length = 48, you predict 2 days ahead 48")
-    argparser.add_argument("--forecast_window", type=int, default=4,
+    argparser.add_argument("--forecast_window", type=int, default=10,
                            help="window you forecast in future")
     argparser.add_argument("--step_size", type=int, default=1,
                            help="Step size, i.e. how many time steps does the moving window move at each step")
@@ -185,8 +185,8 @@ if __name__ == "__main__":
 
     # Define input variables 
     if args.LINEAR_DECODER:
-        args.output_sequence_length = args.enc_seq_len
-    window_size = args.enc_seq_len + args.output_sequence_length # used to slice data into sub-sequences
+        args.output_seq_len = args.enc_seq_len
+    window_size = args.enc_seq_len + args.output_seq_len # used to slice data into sub-sequences
     exogenous_vars = args.exogenous_vars.split(',')
     input_variables = [args.target_col_name] + exogenous_vars
     input_size = len(input_variables)
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         input_len=window_size,
         step_size=window_size,
         forecast_horizon=0,
-        target_len=args.output_sequence_length,
+        target_len=args.output_seq_len,
         slice_size=test_slice_size
     )
 
@@ -243,8 +243,8 @@ if __name__ == "__main__":
         data=torch.tensor(amplitude).float(),
         indices=test_indices,
         enc_seq_len=args.enc_seq_len,
-        dec_seq_len=args.output_sequence_length,
-        target_seq_len=args.output_sequence_length,
+        dec_seq_len=args.output_seq_len,
+        target_seq_len=args.output_seq_len,
         slice_size=test_slice_size
         )
 
@@ -252,29 +252,29 @@ if __name__ == "__main__":
     test_time_data = DataLoader(test_time_data, args.batch_size)
 
     # Make src mask for decoder with size:
-    # [batch_size*n_heads, output_sequence_length, enc_seq_len]
+    # [batch_size*n_heads, output_seq_len, enc_seq_len]
     src_mask = utils.generate_square_subsequent_mask(
-        dim1=args.output_sequence_length,
+        dim1=args.output_seq_len,
         dim2=args.enc_seq_len
         ).to(device)
 
     # Make tgt mask for decoder with size:
-    # [batch_size*n_heads, output_sequence_length, output_sequence_length]
+    # [batch_size*n_heads, output_seq_len, output_seq_len]
     tgt_mask = utils.generate_square_subsequent_mask( 
-        dim1=args.output_sequence_length,
-        dim2=args.output_sequence_length
+        dim1=args.output_seq_len,
+        dim2=args.output_seq_len
         ).to(device)
 
     # Initialize the model with the same architecture and initialization as when it was saved
     model = tst.TimeSeriesTransformer(
         input_size=len(input_variables),
-        dec_seq_len=args.enc_seq_len,
+        dec_seq_len=args.dec_seq_len,
         batch_first=args.batch_first,
         num_predicted_features=len(input_variables) # 1 if univariate
         ).to(device)
 
     # Define the file path, same as the forecast_window
-    PATH = 'model/model4D_{}_{}.pth'.format(args.enc_seq_len, args.output_sequence_length)
+    PATH = 'model/model4D_{}_{}.pth'.format(args.enc_seq_len, args.output_seq_len)
 
     # Load the saved state dictionary into the model
     model.load_state_dict(torch.load(PATH))

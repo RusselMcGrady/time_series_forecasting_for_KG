@@ -125,6 +125,7 @@ if __name__ == "__main__":
                            help="file name wo/ suffix")
     argparser.add_argument("--SCALER", type=bool, default=True)
     argparser.add_argument("--LINEAR_DECODER", type=bool, default=False)
+    argparser.add_argument("--num_epochs", type=int, default=50)
     argparser.add_argument("--test_size", type=float, default=0.2)
     argparser.add_argument("--batch_size", type=int, default=32)
     argparser.add_argument("--dim_val", type=int, default=512)
@@ -249,18 +250,17 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
 
     # Define the warm-up schedule
-    num_epochs = 50 # 50
     # total_steps = len(training_time_data) * num_epochs
     # Create the scheduler
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=5, num_training_steps=num_epochs)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.95)
 
 
-    for epoch in range(num_epochs):
+    for epoch in range(args.num_epochs):
         output = train(model, training_time_data, src_mask, tgt_mask, loss_fn, optimizer, scheduler, args.batch_first, args.batch_size, input_size, args.LINEAR_DECODER)
 
-        if epoch == num_epochs-1:
-            print('hidden embeddings of epoch {}: {}'.format(epoch, output))
+        # if epoch == args.num_epochs-1:
+        #     print('hidden embeddings of epoch {}: {}'.format(epoch, output))
                 
         if (epoch+1) % 10 == 0:
             # Save the model
